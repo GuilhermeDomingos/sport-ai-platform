@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from app.schemas.camera_schema import CameraView
+from app.schemas.camera_schema import CameraView, CameraViewValidationResult
 from app.schemas.feedback_schema import FeedbackResponse
 from app.schemas.metrics_schema import SquatMetrics
 from app.schemas.movement_schema import RepAnalysis
@@ -12,6 +12,7 @@ class PersistedMetrics(BaseModel):
     videoId: str
     movement: str
     camera_view: CameraView | None = None
+    camera_view_validation: CameraViewValidationResult | None = None
     metrics: SquatMetrics
 
 
@@ -20,6 +21,7 @@ class AnalysisResponse(BaseModel):
     status: str
     movement: str
     camera_view: CameraView | None = None
+    camera_view_validation: CameraViewValidationResult | None = None
     metadata: VideoMetadata
     metrics: SquatMetrics
     totalReps: int

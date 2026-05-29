@@ -7,6 +7,10 @@ from fastapi import HTTPException, status
 from app.core.config import OUTPUT_DIR
 from app.modules.biomechanics.lateral_metrics import calculate_lateral_metrics
 from app.schemas.camera_schema import CameraView
+from app.services.camera_view_validation_service import (
+    ensure_camera_view_allowed,
+    get_or_create_camera_view_validation,
+)
 from app.services.video_service import get_video_info
 
 
@@ -72,6 +76,10 @@ def calculate_metrics(video_id: str) -> dict:
     normalized_id = video_info["videoId"]
     frames = _load_landmarks(normalized_id)
     camera_view = CameraView(video_info.get("cameraView", CameraView.FRONT.value))
+    camera_view_validation = get_or_create_camera_view_validation(
+        normalized_id, camera_view, frames
+    )
+    ensure_camera_view_allowed(camera_view_validation)
 
     if camera_view is CameraView.SIDE:
         metrics, calculated_frames = calculate_lateral_metrics(frames)
@@ -90,6 +98,9 @@ def calculate_metrics(video_id: str) -> dict:
                     "videoId": normalized_id,
                     "movement": video_info.get("exerciseType", "squat"),
                     "camera_view": camera_view.value,
+                    "camera_view_validation": camera_view_validation.model_dump(
+                        mode="json"
+                    ),
                     "metrics": metrics,
                 },
                 output,
@@ -102,6 +113,7 @@ def calculate_metrics(video_id: str) -> dict:
             "status": "metrics_calculated",
             "movement": video_info.get("exerciseType", "squat"),
             "camera_view": camera_view.value,
+            "camera_view_validation": camera_view_validation.model_dump(mode="json"),
             "metrics": metrics,
         }
 
@@ -202,6 +214,9 @@ def calculate_metrics(video_id: str) -> dict:
                 "videoId": normalized_id,
                 "movement": video_info.get("exerciseType", "squat"),
                 "camera_view": camera_view.value,
+                "camera_view_validation": camera_view_validation.model_dump(
+                    mode="json"
+                ),
                 "metrics": metrics,
             },
             output,
@@ -214,5 +229,6 @@ def calculate_metrics(video_id: str) -> dict:
         "status": "metrics_calculated",
         "movement": video_info.get("exerciseType", "squat"),
         "camera_view": camera_view.value,
+        "camera_view_validation": camera_view_validation.model_dump(mode="json"),
         "metrics": metrics,
     }

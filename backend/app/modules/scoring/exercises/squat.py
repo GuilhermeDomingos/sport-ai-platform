@@ -12,6 +12,7 @@ from app.modules.scoring.config import (
     FRONTAL_SCORE_TYPE,
 )
 from app.modules.scoring.schemas import ScoreComponent, ScoreDetail, ScoreResult, ScoringInput
+from app.schemas.camera_schema import CameraViewValidationResult, CameraViewValidationStatus
 
 
 DEPTH_SCORES = {
@@ -217,7 +218,9 @@ def calculate_squat_motor_control_score(
 
 
 def calculate_squat_analysis_confidence_score(
-    metrics: dict[str, Any], pose_quality: dict[str, Any] | None = None
+    metrics: dict[str, Any],
+    pose_quality: dict[str, Any] | None = None,
+    camera_view_validation: CameraViewValidationResult | None = None,
 ) -> ScoreComponent:
     weights = SCORE_WEIGHTS["squat"]
     pose_quality = pose_quality or {}
@@ -228,12 +231,20 @@ def calculate_squat_analysis_confidence_score(
     )
     valid_reps = int(pose_quality.get("valid_reps", 0))
     rep_score = 100 if valid_reps >= 2 else 70 if valid_reps == 1 else 35
+    camera_view_score = 100
+    if camera_view_validation is not None:
+        camera_view_score = (
+            min(camera_view_validation.confidence, 60)
+            if camera_view_validation.status is CameraViewValidationStatus.UNCERTAIN
+            else camera_view_validation.confidence
+        )
     score = weighted_score(
         [
-            (valid_frames, 0.35),
-            (avg_visibility, 0.30),
+            (valid_frames, 0.30),
+            (avg_visibility, 0.25),
             (critical_visibility, 0.20),
-            (rep_score, 0.15),
+            (rep_score, 0.05),
+            (camera_view_score, 0.20),
         ]
     )
     return _component(
@@ -258,6 +269,16 @@ def calculate_squat_analysis_confidence_score(
                 value=valid_reps,
                 status=score_status(rep_score, confidence_component=True),
                 message="Quantidade de repeticoes completas detectadas.",
+            ),
+            ScoreDetail(
+                metric="camera_view_validation",
+                value=(
+                    camera_view_validation.status.value
+                    if camera_view_validation is not None
+                    else "not_available"
+                ),
+                status=score_status(camera_view_score, confidence_component=True),
+                message="Confianca da validacao do angulo do video.",
             ),
         ],
         confidence_component=True,
@@ -318,7 +339,7 @@ def calculate_squat_score(scoring_input: ScoringInput) -> ScoreResult:
     symmetry = calculate_squat_symmetry_score(metrics, scoring_input.reps)
     motor_control = calculate_squat_motor_control_score(metrics, scoring_input.reps)
     confidence = calculate_squat_analysis_confidence_score(
-        metrics, scoring_input.pose_quality
+        metrics, scoring_input.pose_quality, scoring_input.camera_view_validation
     )
     components = [mobility, stability, symmetry, motor_control, confidence]
 
@@ -327,6 +348,11 @@ def calculate_squat_score(scoring_input: ScoringInput) -> ScoreResult:
         warnings.append(
             "A analise pode estar limitada porque a deteccao corporal ou o enquadramento ficaram abaixo do ideal."
         )
+    if (
+        scoring_input.camera_view_validation is not None
+        and scoring_input.camera_view_validation.status is CameraViewValidationStatus.UNCERTAIN
+    ):
+        warnings.extend(scoring_input.camera_view_validation.warnings)
 
     if confidence.score < MIN_CONFIDENCE_TO_SCORE:
         final_score = None

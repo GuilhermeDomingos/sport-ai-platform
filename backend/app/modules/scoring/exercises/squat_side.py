@@ -11,6 +11,7 @@ from app.modules.scoring.config import (
     SCORE_VERSION,
 )
 from app.modules.scoring.schemas import ScoreComponent, ScoreDetail, ScoreResult, ScoringInput
+from app.schemas.camera_schema import CameraViewValidationResult, CameraViewValidationStatus
 
 
 WEIGHTS = SCORE_CONFIG[("squat", "side")]["weights"]
@@ -239,7 +240,9 @@ def calculate_lateral_motor_control_score(
 
 
 def calculate_lateral_analysis_confidence_score(
-    metrics: dict[str, Any], reps: list[dict[str, Any]] | None = None
+    metrics: dict[str, Any],
+    reps: list[dict[str, Any]] | None = None,
+    camera_view_validation: CameraViewValidationResult | None = None,
 ) -> ScoreComponent:
     reps = reps or []
     valid_frames = clamp_score(_metric(metrics, "valid_pose_frame_ratio", 0) * 100)
@@ -250,12 +253,20 @@ def calculate_lateral_analysis_confidence_score(
         _metric(metrics, "critical_landmarks_visible_ratio", 0) * 100
     )
     rep_score = 100 if len(reps) >= 2 else 75 if len(reps) == 1 else 35
+    camera_view_score = 100
+    if camera_view_validation is not None:
+        camera_view_score = (
+            min(camera_view_validation.confidence, 60)
+            if camera_view_validation.status is CameraViewValidationStatus.UNCERTAIN
+            else camera_view_validation.confidence
+        )
     score = weighted_score(
         [
-            (valid_frames, 0.35),
-            (side_confidence, 0.30),
+            (valid_frames, 0.30),
+            (side_confidence, 0.25),
             (critical, 0.20),
-            (rep_score, 0.15),
+            (rep_score, 0.05),
+            (camera_view_score, 0.20),
         ]
     )
     return _component(
@@ -279,6 +290,16 @@ def calculate_lateral_analysis_confidence_score(
                 value=len(reps),
                 status=score_status(rep_score, confidence_component=True),
                 message="Quantidade de repeticoes completas detectadas.",
+            ),
+            ScoreDetail(
+                metric="camera_view_validation",
+                value=(
+                    camera_view_validation.status.value
+                    if camera_view_validation is not None
+                    else "not_available"
+                ),
+                status=score_status(camera_view_score, confidence_component=True),
+                message="Confianca da validacao do angulo do video.",
             ),
         ],
         confidence_component=True,
@@ -337,7 +358,9 @@ def calculate_squat_side_score(scoring_input: ScoringInput) -> ScoreResult:
     joint_kinematics = calculate_joint_kinematics_score(metrics)
     trunk_posture = calculate_trunk_posture_score(metrics)
     motor_control = calculate_lateral_motor_control_score(metrics, scoring_input.reps)
-    confidence = calculate_lateral_analysis_confidence_score(metrics, scoring_input.reps)
+    confidence = calculate_lateral_analysis_confidence_score(
+        metrics, scoring_input.reps, scoring_input.camera_view_validation
+    )
     components = [
         amplitude_depth,
         joint_kinematics,
@@ -351,6 +374,11 @@ def calculate_squat_side_score(scoring_input: ScoringInput) -> ScoreResult:
         warnings.append(
             "A analise lateral foi gerada com confianca limitada. Tente gravar novamente com o corpo inteiro visivel, principalmente ombro, quadril, joelho e tornozelo."
         )
+    if (
+        scoring_input.camera_view_validation is not None
+        and scoring_input.camera_view_validation.status is CameraViewValidationStatus.UNCERTAIN
+    ):
+        warnings.extend(scoring_input.camera_view_validation.warnings)
 
     if confidence.score < MIN_CONFIDENCE_TO_SCORE:
         final_score = None
@@ -405,4 +433,3 @@ def calculate_squat_side_score(scoring_input: ScoringInput) -> ScoreResult:
         score_version=SCORE_VERSION,
         sub_scores={component.name: component.score for component in components},
     )
-
