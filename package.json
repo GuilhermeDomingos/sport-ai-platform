@@ -1,0 +1,17 @@
+{
+  "name": "sport-ai-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @sport-ai-platform/frontend",
+    "dev:frontend": "npm run dev --workspace @sport-ai-platform/frontend",
+    "build": "npm run build --workspace @sport-ai-platform/frontend",
+    "build:frontend": "npm run build --workspace @sport-ai-platform/frontend",
+    "start": "npm run start --workspace @sport-ai-platform/frontend",
+    "lint": "npm run lint --workspace @sport-ai-platform/frontend"
+  }
+}

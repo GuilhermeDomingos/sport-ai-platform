@@ -1,0 +1,874 @@
+{
+  "info": {
+    "_postman_id": "62bdd814-aa07-483d-880c-846b251899e0",
+    "name": "Sport AI API - Backend",
+    "description": "Collection para testar a API inicial de upload, processamento, extracao de frames, deteccao de pose, metricas biomecanicas, analise temporal, scoring e feedback da Sport AI Platform.\n\nAntes de executar, inicie o backend em http://localhost:8000.\n\nNo request de upload, selecione manualmente um arquivo de video valido no campo `file`. Ao concluir um upload com sucesso, o `videoId` retornado sera salvo automaticamente na variavel da collection e utilizado nos requests seguintes. Execute `Extract Frames` e `Detect Pose` antes de `Calculate Metrics` e `Analyze Movement`; execute `Analyze Movement` antes de `Calculate Score`; execute `Calculate Score` antes de `Generate Feedback`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Verifica se a API esta respondendo."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Health check retorna 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Status da API esta ok\", function () {",
+              "    pm.expect(pm.response.json().status).to.eql(\"ok\");",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Videos",
+      "item": [
+        {
+          "name": "Upload Video",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "description": "Selecione um video mp4, mov, avi, mkv ou webm de ate 200 MB.",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "exerciseType",
+                  "value": "squat",
+                  "type": "text"
+                },
+                {
+                  "key": "cameraView",
+                  "value": "side",
+                  "description": "Use front para video frontal ou side para video lateral.",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/videos/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "upload"
+              ]
+            },
+            "description": "Envia um arquivo de video no campo multipart/form-data `file`, com `exerciseType=squat` e `cameraView=front|side`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Upload retorna 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"videoId\", body.videoId);",
+                  "",
+                  "    pm.test(\"Resposta inclui videoId\", function () {",
+                  "        pm.expect(body.videoId).to.be.a(\"string\").and.not.empty;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Video Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}"
+              ]
+            },
+            "description": "Consulta o video correspondente ao ultimo `videoId` recebido no upload."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Consulta retorna 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Video foi encontrado\", function () {",
+                  "    pm.expect(pm.response.json().exists).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Process Video",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/process",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "process"
+              ]
+            },
+            "description": "Processa o ultimo video enviado e extrai metadados reais com OpenCV."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Processamento retorna 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Processamento retorna metadados tecnicos\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"processed\");",
+                  "    pm.expect(body.metadata).to.have.property(\"fps\");",
+                  "    pm.expect(body.metadata).to.have.property(\"totalFrames\");",
+                  "    pm.expect(body.metadata).to.have.property(\"durationSeconds\");",
+                  "    pm.expect(body.metadata).to.have.property(\"resolution\");",
+                  "    pm.expect(body.metadata).to.have.property(\"fileSizeMb\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Process Video - Not Found",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/00000000-0000-0000-0000-000000000000/process",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "00000000-0000-0000-0000-000000000000",
+                "process"
+              ]
+            },
+            "description": "Valida o retorno de erro ao processar um video inexistente."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Processamento de video inexistente retorna 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extract Frames",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/frames/extract?interval_seconds=0.5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "frames",
+                "extract"
+              ],
+              "query": [
+                {
+                  "key": "interval_seconds",
+                  "value": "0.5"
+                }
+              ]
+            },
+            "description": "Extrai frames JPEG do ultimo video enviado a cada 0.5 segundos."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Extracao retorna 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Frames foram extraidos\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"frames_extracted\");",
+                  "    pm.expect(body.frameIntervalSeconds).to.eql(0.5);",
+                  "    pm.expect(body.totalFramesExtracted).to.be.above(0);",
+                  "    pm.expect(body.frames.length).to.eql(body.totalFramesExtracted);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extract Frames - Invalid Interval",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/frames/extract?interval_seconds=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "frames",
+                "extract"
+              ],
+              "query": [
+                {
+                  "key": "interval_seconds",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Valida a rejeicao de intervalos menores ou iguais a zero."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Intervalo invalido retorna 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extract Frames - Not Found",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/00000000-0000-0000-0000-000000000000/frames/extract?interval_seconds=0.5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "00000000-0000-0000-0000-000000000000",
+                "frames",
+                "extract"
+              ],
+              "query": [
+                {
+                  "key": "interval_seconds",
+                  "value": "0.5"
+                }
+              ]
+            },
+            "description": "Valida o retorno de erro ao extrair frames de um video inexistente."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Extracao de video inexistente retorna 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detect Pose",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/pose/detect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "pose",
+                "detect"
+              ]
+            },
+            "description": "Detecta landmarks nos frames extraidos. Execute `Extract Frames` primeiro."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Deteccao de pose retorna 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Landmarks foram processados\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"pose_detected\");",
+                  "    pm.expect(body.totalFramesProcessed).to.be.above(0);",
+                  "    pm.expect(body.outputFile).to.include(\"landmarks.json\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detect Pose - Frames Not Found",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/pose/detect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "pose",
+                "detect"
+              ]
+            },
+            "description": "Execute apos um novo upload e antes de extrair frames para validar o retorno 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Pose sem frames retorna 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detect Pose - Video Not Found",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/00000000-0000-0000-0000-000000000000/pose/detect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "00000000-0000-0000-0000-000000000000",
+                "pose",
+                "detect"
+              ]
+            },
+            "description": "Valida o retorno de erro ao detectar pose para um video inexistente."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Pose de video inexistente retorna 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Calculate Metrics",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/metrics/calculate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "metrics",
+                "calculate"
+              ]
+            },
+            "description": "Calcula metricas iniciais de squat usando landmarks. Execute `Detect Pose` primeiro."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Metricas retornam 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Metricas biomecanicas foram calculadas\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"metrics_calculated\");",
+                  "    pm.expect(body.movement).to.eql(\"squat\");",
+                  "    pm.expect(body.metrics).to.have.property(\"averageKneeAngle\");",
+                  "    pm.expect(body.metrics).to.have.property(\"depthClassification\");",
+                  "    pm.expect(body.metrics).to.have.property(\"symmetryScore\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Calculate Metrics - Landmarks Not Found",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/metrics/calculate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "metrics",
+                "calculate"
+              ]
+            },
+            "description": "Execute apos upload e antes de detectar pose para validar o retorno 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Metricas sem landmarks retornam 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Analyze Movement",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/movement/analyze",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "movement",
+                "analyze"
+              ]
+            },
+            "description": "Segmenta repeticoes do squat a partir dos landmarks. Execute `Detect Pose` primeiro."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Analise de movimento retorna 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Resposta inclui repeticoes\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.movement).to.eql(\"squat\");",
+                  "    pm.expect(body.totalReps).to.be.a(\"number\");",
+                  "    pm.expect(body.reps).to.be.an(\"array\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Analyze Movement - Landmarks Not Found",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/movement/analyze",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "movement",
+                "analyze"
+              ]
+            },
+            "description": "Execute apos upload e antes de detectar pose para validar o retorno 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Movimento sem landmarks retorna 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Calculate Score",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/score/calculate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "score",
+                "calculate"
+              ]
+            },
+            "description": "Calcula scores biomecanicos a partir das reps. Execute `Analyze Movement` primeiro."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Scoring retorna 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Scores estao limitados entre 0 e 100\", function () {",
+                  "    const score = pm.response.json().score;",
+                  "    pm.expect(pm.response.json().status).to.eql(\"score_calculated\");",
+                  "    Object.values(score).forEach(function (value) {",
+                  "        pm.expect(value).to.be.within(0, 100);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Calculate Score - Movement Not Found",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/score/calculate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "score",
+                "calculate"
+              ]
+            },
+            "description": "Execute apos upload e antes de analisar movimento para validar o retorno 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Scoring sem movement analysis retorna 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Feedback",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/feedback/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "feedback",
+                "generate"
+              ]
+            },
+            "description": "Gera resumo, pontos fortes, melhorias e recomendacoes. Execute `Calculate Score` primeiro."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Feedback retorna 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Feedback possui listas acionaveis\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"feedback_generated\");",
+                  "    pm.expect(body.summary).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.strengths).to.be.an(\"array\");",
+                  "    pm.expect(body.improvements).to.be.an(\"array\");",
+                  "    pm.expect(body.recommendations).to.be.an(\"array\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Feedback - Scoring Not Found",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/feedback/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "feedback",
+                "generate"
+              ]
+            },
+            "description": "Execute apos upload e antes de calcular score para validar o retorno 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Feedback sem scoring retorna 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Analysis",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/analysis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "analysis"
+              ]
+            },
+            "description": "Consulta o resultado real consolidado apos gerar feedback."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Consulta da analise retorna 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Resposta possui relatorio real\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql(\"completed\");",
+                  "    pm.expect(body.movement).to.eql(\"squat\");",
+                  "    pm.expect(body.metadata.durationSeconds).to.be.a(\"number\");",
+                  "    pm.expect(body.score.overallScore).to.be.a(\"number\");",
+                  "    pm.expect(body.feedback.summary).to.be.a(\"string\");",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Video Info - Not Found",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            },
+            "description": "Valida o retorno de erro para um video inexistente."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Video inexistente retorna 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "videoId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
