@@ -88,6 +88,11 @@ def get_analysis(video_id: str) -> dict:
         status="completed",
         movement=movement.movement,
         camera_view=movement.camera_view or metrics.camera_view or video_info.get("cameraView"),
+        camera_view_validation=(
+            movement.camera_view_validation
+            or metrics.camera_view_validation
+            or scoring.camera_view_validation
+        ),
         metadata=metadata,
         metrics=metrics.metrics,
         totalReps=movement.totalReps,

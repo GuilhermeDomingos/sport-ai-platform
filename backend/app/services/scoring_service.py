@@ -8,6 +8,11 @@ from app.core.config import OUTPUT_DIR
 from app.modules.scoring.engine import calculate_score as calculate_axon_score
 from app.modules.scoring.schemas import ScoringInput
 from app.schemas.camera_schema import CameraView
+from app.services.camera_view_validation_service import (
+    ensure_camera_view_allowed,
+    get_or_create_camera_view_validation,
+    load_camera_view_validation,
+)
 from app.services.video_service import get_video_info
 
 
@@ -143,6 +148,15 @@ def _pose_quality(video_id: str, valid_reps: int) -> dict:
     }
 
 
+def _load_pose_frames(video_id: str) -> list[dict]:
+    payload = _load_json_file(
+        OUTPUT_DIR / video_id / "pose" / "landmarks.json",
+        "Landmarks nao encontrados. Execute pose detection antes.",
+    )
+    frames = payload.get("frames", [])
+    return frames if isinstance(frames, list) else []
+
+
 def calculate_depth_score(reps: list[dict]) -> int:
     if not reps:
         return 0
@@ -206,6 +220,12 @@ def calculate_score(video_id: str) -> dict:
     movement_analysis = _load_movement_analysis(normalized_id)
     reps = movement_analysis["reps"]
     camera_view = CameraView(video_info.get("cameraView", CameraView.FRONT.value))
+    camera_view_validation = load_camera_view_validation(normalized_id)
+    if camera_view_validation is None:
+        camera_view_validation = get_or_create_camera_view_validation(
+            normalized_id, camera_view, _load_pose_frames(normalized_id)
+        )
+    ensure_camera_view_allowed(camera_view_validation)
 
     depth_score = calculate_depth_score(reps)
     stability_score = calculate_stability_score(reps)
@@ -225,6 +245,7 @@ def calculate_score(video_id: str) -> dict:
             analysis_id=normalized_id,
             exercise_type=movement_analysis.get("movement", "squat"),
             camera_view=camera_view,
+            camera_view_validation=camera_view_validation,
             metrics=metrics_payload["metrics"],
             reps=reps,
             pose_quality=_pose_quality(normalized_id, len(reps)),
@@ -241,6 +262,7 @@ def calculate_score(video_id: str) -> dict:
         "status": "score_calculated",
         "movement": movement_analysis.get("movement", "squat"),
         "camera_view": camera_view.value,
+        "camera_view_validation": camera_view_validation.model_dump(mode="json"),
         "score": score,
     }
 

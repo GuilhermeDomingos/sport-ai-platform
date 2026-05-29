@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.analysis import router as analysis_router
@@ -10,6 +11,10 @@ from app.routes.pose import router as pose_router
 from app.routes.processing import router as processing_router
 from app.routes.scoring import router as scoring_router
 from app.routes.videos import router as videos_router
+from app.services.camera_view_validation_service import (
+    CameraViewMismatchError,
+    mismatch_error_payload,
+)
 
 
 app = FastAPI(
@@ -30,6 +35,16 @@ app.add_middleware(
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.exception_handler(CameraViewMismatchError)
+def camera_view_mismatch_handler(
+    _: Request, exc: CameraViewMismatchError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content=mismatch_error_payload(exc.validation_result),
+    )
 
 
 app.include_router(videos_router, prefix="/videos", tags=["Videos"])

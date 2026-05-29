@@ -2,6 +2,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.camera_schema import CameraViewValidationResult
+
 
 class ScoreDetailSchema(BaseModel):
     metric: str
@@ -43,4 +45,5 @@ class ScoringResponse(BaseModel):
     status: str
     movement: str
     camera_view: str | None = None
+    camera_view_validation: CameraViewValidationResult | None = None
     score: ScoreBreakdown

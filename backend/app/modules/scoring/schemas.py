@@ -2,13 +2,14 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.schemas.camera_schema import CameraView
+from app.schemas.camera_schema import CameraView, CameraViewValidationResult
 
 
 class ScoringInput(BaseModel):
     analysis_id: str
     exercise_type: str
     camera_view: CameraView = CameraView.FRONT
+    camera_view_validation: CameraViewValidationResult | None = None
     metrics: dict[str, Any]
     reps: list[dict[str, Any]] = Field(default_factory=list)
     pose_quality: dict[str, Any] | None = None

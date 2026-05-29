@@ -18,6 +18,17 @@ def _artifacts(video_id: str) -> dict[str, dict]:
         "metrics/metrics.json": {
             "videoId": video_id,
             "movement": "squat",
+            "camera_view_validation": {
+                "selected_camera_view": "side",
+                "detected_camera_view": "side",
+                "confidence": 84,
+                "status": "valid",
+                "is_valid": True,
+                "should_block_analysis": False,
+                "message": "Tipo de video validado com sucesso.",
+                "reasons": ["O video apresenta caracteristicas compativeis com visao lateral."],
+                "warnings": [],
+            },
             "metrics": {
                 "averageKneeAngle": 141.03,
                 "minKneeAngle": 82.07,
@@ -150,6 +161,8 @@ def test_get_analysis_returns_consolidated_real_result(
     assert body["videoId"] == video_id
     assert body["status"] == "completed"
     assert body["movement"] == "squat"
+    assert body["camera_view_validation"]["status"] == "valid"
+    assert body["camera_view_validation"]["detected_camera_view"] == "side"
     assert body["metadata"]["durationSeconds"] == 12.5
     assert body["metrics"]["minKneeAngle"] == 82.07
     assert body["totalReps"] == 1

@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from app.schemas.camera_schema import CameraView
+from app.schemas.camera_schema import CameraView, CameraViewValidationResult
 
 
 class SquatMetrics(BaseModel):
@@ -36,4 +36,5 @@ class MetricsCalculationResponse(BaseModel):
     status: str
     movement: str
     camera_view: CameraView | None = None
+    camera_view_validation: CameraViewValidationResult | None = None
     metrics: SquatMetrics
