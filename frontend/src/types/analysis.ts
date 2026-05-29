@@ -1,4 +1,28 @@
 export type CameraView = "front" | "side";
+export type DetectedCameraView = CameraView | "unknown";
+export type CameraViewValidationStatus = "valid" | "mismatch" | "uncertain";
+
+export type CameraViewValidation = {
+  selected_camera_view: CameraView;
+  detected_camera_view: DetectedCameraView;
+  confidence: number;
+  status: CameraViewValidationStatus;
+  is_valid: boolean;
+  should_block_analysis: boolean;
+  message: string;
+  reasons: string[];
+  warnings: string[];
+};
+
+export type CameraViewMismatchErrorPayload = {
+  code: "CAMERA_VIEW_MISMATCH";
+  message: string;
+  selected_camera_view: CameraView;
+  detected_camera_view: Exclude<DetectedCameraView, "unknown">;
+  confidence: number;
+  reasons: string[];
+  recommendations: string[];
+};
 
 export type UploadResponse = {
   message: string;
@@ -75,6 +99,7 @@ export type MetricsResponse = {
     bottom_control?: number | null;
   };
   camera_view?: CameraView | null;
+  camera_view_validation?: CameraViewValidation | null;
 };
 
 export type RepAnalysis = {
@@ -94,6 +119,7 @@ export type MovementAnalysisResponse = {
   videoId: string;
   movement: string;
   camera_view?: CameraView | null;
+  camera_view_validation?: CameraViewValidation | null;
   visibleSide?: "left" | "right" | null;
   totalReps: number;
   reps: RepAnalysis[];
@@ -141,6 +167,7 @@ export type ScoreResponse = {
   status: string;
   movement: string;
   camera_view?: CameraView | null;
+  camera_view_validation?: CameraViewValidation | null;
   score: AxonMovementScore | LegacyScore;
 };
 
@@ -160,6 +187,7 @@ export type AnalysisResult = {
   status: string;
   movement: string;
   camera_view?: CameraView | null;
+  camera_view_validation?: CameraViewValidation | null;
   metadata: VideoMetadata;
   metrics: MetricsResponse["metrics"];
   totalReps: number;

@@ -21,10 +21,15 @@ import {
   detectPose,
   extractFrames,
   generateFeedback,
+  isCameraViewMismatchError,
   processVideo,
   uploadVideo,
 } from "@/services/sportAiApi";
-import type { CameraView, PipelineState } from "@/types/analysis";
+import type {
+  CameraView,
+  CameraViewMismatchErrorPayload,
+  PipelineState,
+} from "@/types/analysis";
 
 export function VideoUploadCard() {
   const router = useRouter();
@@ -34,6 +39,8 @@ export function VideoUploadCard() {
   const [duration, setDuration] = useState<number | null>(null);
   const [state, setState] = useState<PipelineState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [cameraViewMismatch, setCameraViewMismatch] =
+    useState<CameraViewMismatchErrorPayload | null>(null);
   const [dragging, setDragging] = useState(false);
   const [cameraView, setCameraView] = useState<CameraView | null>(null);
 
@@ -55,6 +62,7 @@ export function VideoUploadCard() {
     setDuration(null);
     setState("idle");
     setError(null);
+    setCameraViewMismatch(null);
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -67,13 +75,15 @@ export function VideoUploadCard() {
     chooseFile(event.dataTransfer.files?.[0]);
   }
 
-  async function handleAnalyze() {
-    if (!file || !cameraView) return;
+  async function handleAnalyze(cameraViewOverride?: CameraView) {
+    const selectedCameraView = cameraViewOverride ?? cameraView;
+    if (!file || !selectedCameraView) return;
 
     setError(null);
+    setCameraViewMismatch(null);
     try {
       setState("uploading");
-      const uploaded = await uploadVideo(file, cameraView);
+      const uploaded = await uploadVideo(file, selectedCameraView);
 
       setState("processing");
       await processVideo(uploaded.videoId);
@@ -100,12 +110,24 @@ export function VideoUploadCard() {
       router.push(`/results/${uploaded.videoId}`);
     } catch (requestError) {
       setState("error");
+      if (isCameraViewMismatchError(requestError)) {
+        setCameraViewMismatch(requestError.payload);
+        setError(null);
+        return;
+      }
       setError(
         requestError instanceof Error
           ? requestError.message
           : "A análise foi interrompida. Tente novamente.",
       );
     }
+  }
+
+  function handleUseDetectedView() {
+    if (!cameraViewMismatch) return;
+    const nextCameraView = cameraViewMismatch.detected_camera_view;
+    setCameraView(nextCameraView);
+    void handleAnalyze(nextCameraView);
   }
 
   const running = state !== "idle" && state !== "completed" && state !== "error";
@@ -226,7 +248,7 @@ export function VideoUploadCard() {
             <Button
               className="mt-4 w-full py-3 sm:w-auto"
               disabled={!canAnalyze}
-              onClick={handleAnalyze}
+              onClick={() => void handleAnalyze()}
               type="button"
             >
               {running ? "Analisando vídeo..." : "Analisar vídeo"}
@@ -245,7 +267,68 @@ export function VideoUploadCard() {
           {error}
         </p>
       )}
+      {cameraViewMismatch && (
+        <div className="mt-6 rounded-xl border border-amber-400/25 bg-amber-400/[0.08] p-5 text-sm text-amber-100">
+          <p className="text-base font-semibold text-amber-100">
+            Tipo de video diferente do selecionado
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <MismatchStat
+              label="Selecionado"
+              value={cameraViewLabel(cameraViewMismatch.selected_camera_view)}
+            />
+            <MismatchStat
+              label="Detectado"
+              value={cameraViewLabel(cameraViewMismatch.detected_camera_view)}
+            />
+            <MismatchStat
+              label="Confianca"
+              value={`${cameraViewMismatch.confidence}%`}
+            />
+          </div>
+          <p className="mt-4 leading-6 text-amber-100/85">
+            {cameraViewMismatch.message}
+          </p>
+          {cameraViewMismatch.recommendations.length > 0 && (
+            <ul className="mt-4 space-y-2 text-amber-100/80">
+              {cameraViewMismatch.recommendations.map((recommendation) => (
+                <li className="flex gap-3" key={recommendation}>
+                  <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-amber-200" />
+                  {recommendation}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <Button onClick={handleUseDetectedView} type="button">
+              Alterar para {cameraViewLabel(cameraViewMismatch.detected_camera_view)} e reenviar
+            </Button>
+            <Button
+              onClick={() => inputRef.current?.click()}
+              type="button"
+              variant="secondary"
+            >
+              Escolher outro video
+            </Button>
+          </div>
+        </div>
+      )}
       {state !== "idle" && <ProcessingSteps state={state} />}
     </Card>
+  );
+}
+
+function cameraViewLabel(cameraView: CameraView) {
+  return cameraView === "side" ? "Lateral" : "Frontal";
+}
+
+function MismatchStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-[#0B0F14]/55 px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.16em] text-amber-100/60">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold text-amber-50">{value}</p>
+    </div>
   );
 }
